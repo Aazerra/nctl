@@ -1,6 +1,6 @@
 # Nctl: Another nginxctl but with golang (WIP)
 
-##Requirements:
+## Requirements:
 - Go 1.19 or upper
 
 ## Install

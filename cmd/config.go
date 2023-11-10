@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"nctl/systemd"
+	"nctl/utils"
 	"os"
 	"path"
 
@@ -31,7 +33,7 @@ var configCmd = &cobra.Command{
 		}
 		var baseDir string
 		baseDir, err = cmd.Flags().GetString("base-dir")
-		failOnErr(err)
+		utils.FailOnErr(err)
 		if baseDir == "" {
 			if Debug {
 				baseDir = currentWorkingDirectory
@@ -40,8 +42,8 @@ var configCmd = &cobra.Command{
 			}
 		}
 
-		configDir := fmt.Sprintf("%s/sites_avaliable/", baseDir)
-		enabledDir := fmt.Sprintf("%s/sites_enabled/", baseDir)
+		configDir := fmt.Sprintf("%s/sites-available/", baseDir)
+		enabledDir := fmt.Sprintf("%s/sites-enabled/", baseDir)
 		config := Config{
 			baseDir:    baseDir,
 			enabledDir: enabledDir,
@@ -69,11 +71,15 @@ var enableConfig = &cobra.Command{
 		}
 	},
 	Run: func(cmd *cobra.Command, args []string) {
-		config := cmd.Context().Value("config").(Config)
+		ctx := cmd.Context()
+		config := ctx.Value("config").(Config)
 		source := path.Join(config.configDir, args[0])
 		destination := path.Join(config.enabledDir, args[0])
-		os.Symlink(source, destination)
+		err := os.Symlink(source, destination)
+		utils.FailOnErr(err)
 		log.Printf("Config %s successfuly enabled", args[0])
+		s := systemd.New(ctx)
+		s.RestartUnit(ctx, "nginx.service")
 	},
 }
 
@@ -81,10 +87,14 @@ var disableConfig = &cobra.Command{
 	Use:   "disable",
 	Short: "disable config",
 	Run: func(cmd *cobra.Command, args []string) {
-		config := cmd.Context().Value("config").(Config)
+		ctx := cmd.Context()
+		config := ctx.Value("config").(Config)
 		destination := path.Join(config.enabledDir, args[0])
-		os.Remove(destination)
+		err := os.Remove(destination)
+		utils.FailOnErr(err)
 		log.Printf("Config %s successfuly disabled", args[0])
+		s := systemd.New(ctx)
+		s.RestartUnit(ctx, "nginx.service")
 	},
 }
 
@@ -95,9 +105,9 @@ var listConfig = &cobra.Command{
 		config := cmd.Context().Value("config").(Config)
 
 		files, err := os.ReadDir(config.configDir)
-		failOnErr(err)
+		utils.FailOnErr(err)
 		enabledfiles, err := os.ReadDir(config.enabledDir)
-		failOnErr(err)
+		utils.FailOnErr(err)
 		var enabledfileNames []string
 
 		for _, file := range enabledfiles {
@@ -108,10 +118,17 @@ var listConfig = &cobra.Command{
 		t.SetOutputMirror(os.Stdout)
 		t.AppendHeader(table.Row{"#", "Config Name", "Status"})
 
+		existsOrNot := func(exists bool) string {
+			if exists {
+				return "✔️"
+			}
+			return "✖️"
+		}
+
 		for index, file := range files {
-			exists, _ := in_array(file.Name(), enabledfileNames)
+			exists, _ := utils.InArray(file.Name(), enabledfileNames)
 			t.AppendRow(table.Row{
-				index + 1, file.Name(), exists,
+				index + 1, file.Name(), existsOrNot(exists),
 			})
 
 		}

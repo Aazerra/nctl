@@ -1,17 +1,17 @@
-package cmd
+package utils
 
 import (
 	"log"
 	"reflect"
 )
 
-func failOnErr(err error) {
+func FailOnErr(err error) {
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
-func in_array(val interface{}, array interface{}) (exists bool, index int) {
+func InArray(val interface{}, array interface{}) (exists bool, index int) {
 	exists = false
 	index = -1
 
